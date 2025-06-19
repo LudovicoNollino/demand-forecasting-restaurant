@@ -1,0 +1,30 @@
+# Ambienti virtuali
+myenv/
+venv/
+.env/
+.envrc
+
+# Cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Configurazioni IDE/editor
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# File di sistema
+.DS_Store
+Thumbs.db
+
+# Log e output temporanei
+*.log
+*.out
+
+# File di configurazione personali
+*.env
