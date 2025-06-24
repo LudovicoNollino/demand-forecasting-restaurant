@@ -28,3 +28,6 @@ Thumbs.db
 
 # File di configurazione personali
 *.env
+
+# Dataset
+/dataset/
