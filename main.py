@@ -2,6 +2,9 @@ import pandas as pd
 from dataset_manipulation.preprocessing import preprocess_column, inverse_transform_predictions_forecast
 from algorithms.SARIMAX import sarimax_grid_search, fit_sarimax_model
 
+# AGGIUNGI: Importa l'MLP
+from algorithms.mlp_torch import fit_mlp_model
+
 df = pd.read_csv(r"demand-forecasting-restaurant\dataset\chiusure_di giornata_autentiko_beach_estate_2024.csv", sep=';')
 df.columns = df.columns.str.strip()
 df['Data di chiusura'] = pd.to_datetime(df['Data di chiusura'], dayfirst=True, errors='raise')
@@ -16,20 +19,14 @@ from statsmodels.tsa.stattools import adfuller
 from scipy.stats import shapiro
 
 def diagnostica_post_diff(series, d, D, s, col_name="Serie"):
-    # Differenziamento ordinario
     diffed = series.diff(d) if d > 0 else series.copy()
-    # Differenziamento stagionale
     if D > 0:
         diffed = diffed.diff(s * D)
     diffed = diffed.dropna()
-    
-    # Test ADF
     adf_p = adfuller(diffed)[1]
     adf_msg = "stazionaria" if adf_p < 0.05 else "NON stazionaria"
-    # Test Shapiro
     shapiro_p = shapiro(diffed)[1]
     shapiro_msg = "normale" if shapiro_p >= 0.05 else "NON normale"
-    
     print(f"\n--- Diagnostica su '{col_name}' dopo differenziazione d={d}, D={D}, s={s} ---")
     print(f"ADF p-value: {adf_p:.4f} → {adf_msg}")
     print(f"Shapiro p-value: {shapiro_p:.4f} → {shapiro_msg}")
@@ -58,6 +55,8 @@ def get_preprocessed_dict(df, col_name, **kwargs):
         "preprocess_params": params
     }
 
+# ------- SARIMAX -------
+
 guests_data = get_preprocessed_dict(
     df,
     'Numero ospiti',
@@ -76,8 +75,8 @@ model_results_guests, val_predictions_guests, test_predictions_guests = fit_sari
 
 diagnostica_post_diff(
     df['Numero ospiti'].dropna(),
-    d=1,    # parametro d usato sopra
-    D=1,    # parametro D usato sopra
+    d=1,
+    D=1,
     s=seasonal_period,
     col_name='Numero ospiti'
 )
@@ -100,12 +99,59 @@ model_results_closure, val_predictions_closure, test_predictions_closure = fit_s
 
 diagnostica_post_diff(
     df['Chiusura di giornata (scalata in un intervallo)'].dropna(),
-    d=1,    # parametro d usato sopra
-    D=1,    # parametro D usato sopra
+    d=1,
+    D=1,
     s=seasonal_period,
     col_name='Chiusura di giornata (scalata in un intervallo)'
 )
 
+# ------- MLP TORCH --------
+
+print("\n================= MLP TORCH SU 'Numero ospiti' =================")
+from algorithms.mlp_torch import fit_mlp_model
+
+mlp_data = get_preprocessed_dict(
+    df,
+    'Numero ospiti',
+    apply_boxcox=False,
+    apply_kalman=False,
+    apply_standardization=True,
+    seasonal_lag=seasonal_period,
+)
+
+# Parametri per grid search (facoltativo, puoi modificarli!)
+grid_params = dict(
+    hidden1_grid=[8],
+    hidden2_grid=[8],
+    lr_grid=[0.0005],
+    activations=['relu'],
+    n_epochs_grid=[500],
+    batch_size=1,
+    print_every=50
+)
+
+model, best_params, grid, val_pred, test_pred, future_pred = fit_mlp_model(
+    mlp_data,
+    window_size=7,
+    hidden_dim1=16,
+    hidden_dim2=8,
+    lr=0.001,
+    activation='relu',
+    n_epochs=200,
+    batch_size=1,
+    print_every=20,
+    future_steps=30,
+    grid_search=True,
+    grid_params=grid_params,
+    col_name='Numero ospiti',
+    verbose=True
+)
+
+print("\nBest MLP params:", best_params)
+print(f"Validation predictions shape: {val_pred.shape}")
+print(f"Test predictions shape: {test_pred.shape}")
+print(f"Future forecast shape: {future_pred.shape}")
 
 
+# --------- FINE MAIN ---------
 
