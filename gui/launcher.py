@@ -9,6 +9,7 @@ import pandas as pd
 from dataset_manipulation.preprocessing import preprocess_column, inverse_boxcox_transform, apply_kalman_filter
 from algorithms.SARIMAX import sarimax_grid_search, fit_sarimax_model
 from algorithms.mlp_torch import fit_mlp_model
+from algorithms.XGBoost import fit_xgboost_model, xgboost_grid_search
 from statsmodels.tsa.stattools import adfuller
 from scipy.stats import shapiro
 from sklearn.preprocessing import StandardScaler
@@ -187,6 +188,51 @@ class Launcher(QWidget):
                 f"<br><hr><br>Best MLP params: {best_params}"
             )
             QMessageBox.information(self, "MLP", "Analisi MLP completata!")
+        elif algorithm == "XGBoost":
+            print("Sto lanciando XGBoost")
+            # Grid search
+            grid_results, best_config, best_model = xgboost_grid_search(
+                data_dict,
+                look_back_grid=[7, 14, 21, 30, 45, 60],
+                n_estimators_grid=[10, 15, 25, 35, 40, 50, 75, 100],
+            )
+            print("\n--- XGBoost grid search results ---")
+            print(grid_results.head())
+
+            # Fit finale sul best config (come nel main)
+            model_xgb, val_pred_xgb, test_pred_xgb, future_pred_xgb = fit_xgboost_model(
+                data_dict,
+                look_back=best_config[0],
+                n_estimators=best_config[1],
+                col_name=col,
+            )
+
+            # Mostra i risultati nella GUI (puoi personalizzare!)
+            grid_html = ""
+            if grid_results is not None and not grid_results.empty:
+                grid_html = "<br><b>XGBoost Grid Search (primi 5 parametri testati):</b><br><table border='1' cellpadding='3'><tr>"
+                for k in grid_results.columns:
+                    grid_html += f"<th>{k}</th>"
+                grid_html += "</tr>"
+                for _, row in grid_results.head().iterrows():
+                    grid_html += "<tr>"
+                    for v in row.values:
+                        grid_html += f"<td>{v:.4f}" if isinstance(v, float) else f"<td>{v}"
+                        grid_html += "</td>"
+                    grid_html += "</tr>"
+                grid_html += "</table>"
+            else:
+                grid_html = "<br><b>Nessuna grid search eseguita (parametri fissi).</b>"
+
+            self.diagnostica_label.setText(
+                diagnostica_text +
+                grid_html +
+                f"<br><hr><br>Best XGBoost config: {best_config}<br>"
+                f"Validation predictions shape: {val_pred_xgb.shape}<br>"
+                f"Test predictions shape: {test_pred_xgb.shape}<br>"
+                f"Future forecast shape: {future_pred_xgb.shape}"
+            )
+            QMessageBox.information(self, "XGBoost", "Analisi XGBoost completata!")
 
         else:
             self.diagnostica_label.setText("Algoritmo non valido.")
