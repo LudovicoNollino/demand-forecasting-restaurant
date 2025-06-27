@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
 import pandas as pd
 from dataset_manipulation.preprocessing import preprocess_column, inverse_boxcox_transform, apply_kalman_filter
 from algorithms.SARIMAX import sarimax_grid_search, fit_sarimax_model
+from algorithms.mlp_torch import fit_mlp_model
 from statsmodels.tsa.stattools import adfuller
 from scipy.stats import shapiro
 from sklearn.preprocessing import StandardScaler
@@ -32,7 +33,7 @@ class Launcher(QWidget):
         self.std_cb = QCheckBox("Applica Standardization")
         self.alg_label = QLabel("Scegli l'algoritmo:")
         self.alg_combo = QComboBox()
-        self.alg_combo.addItems(["SARIMAX", "XGBoost"])
+        self.alg_combo.addItems(["SARIMAX", "XGBoost", "MLP"])
         self.run_btn = QPushButton("Lancia Analisi")
         self.run_btn.clicked.connect(self.run_analysis)
 
@@ -119,6 +120,7 @@ class Launcher(QWidget):
         }
 
         if algorithm == "SARIMAX":
+            print("Sto lanciando SARIMAX")
             best_order, best_seasonal, _ = sarimax_grid_search(
                 data_dict, seasonal_period=7, max_p=2, max_d=1, max_q=2, max_P=1, max_D=1, max_Q=1
             )
@@ -139,13 +141,57 @@ class Launcher(QWidget):
             self.diagnostica_label.setText(diagnostica_text)
             QMessageBox.information(self, "SARIMAX", "Analisi SARIMAX completata!")
 
-        elif algorithm == "XGBoost":
-            self.diagnostica_label.setText(diagnostica_text)
-            QMessageBox.information(self, "XGBoost", "Funzionalità XGBoost da implementare!")
-            # fit_xgboost_model(data_dict)
+        elif algorithm == "MLP":
+            print("Sto lanciando MLP")
+            model, best_params, grid, val_pred, test_pred, future_pred = fit_mlp_model(
+                data_dict,
+                window_size=7,
+                hidden_dim1=16, hidden_dim2=8,
+                lr=0.001, activation='relu',
+                n_epochs=300,
+                batch_size=1,
+                print_every=20,
+                future_steps=30,
+                grid_search=True,  # Attiva grid search!
+                grid_params={
+                    'hidden1_grid': [8],
+                    'hidden2_grid': [8],
+                    'lr_grid': [0.0005],
+                    'activations': ['relu'],
+                    'n_epochs_grid': [300],
+                    'batch_size': 1,
+                    'print_every': 100
+                },
+                col_name=col,
+                verbose=False  # Setta True per stampa dettagliata!
+            )
+            # Mostra risultati della grid search in HTML
+            grid_html = ""
+            if grid and len(grid) > 0:
+                grid_html = "<br><b>MLP Grid Search (primi 5 parametri testati):</b><br><table border='1' cellpadding='3'><tr>"
+                for k in grid[0].keys():
+                    grid_html += f"<th>{k}</th>"
+                grid_html += "</tr>"
+                for row in grid[:5]:
+                    grid_html += "<tr>"
+                    for v in row.values():
+                        grid_html += f"<td>{v}</td>"
+                    grid_html += "</tr>"
+                grid_html += "</table>"
+            else:
+                grid_html = "<br><b>Nessuna grid search eseguita (parametri fissi).</b>"
+
+            self.diagnostica_label.setText(
+                diagnostica_text +
+                grid_html +
+                f"<br><hr><br>Best MLP params: {best_params}"
+            )
+            QMessageBox.information(self, "MLP", "Analisi MLP completata!")
+
         else:
             self.diagnostica_label.setText("Algoritmo non valido.")
             QMessageBox.warning(self, "Errore", "Algoritmo non valido.")
+
 
     @staticmethod
     def diagnostica_multistep(df, col, apply_boxcox, apply_kalman, apply_standardization):
