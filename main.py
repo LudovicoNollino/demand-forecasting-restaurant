@@ -1,8 +1,7 @@
 import pandas as pd
 from dataset_manipulation.preprocessing import preprocess_column, inverse_transform_predictions_forecast
 from algorithms.SARIMAX import sarimax_grid_search, fit_sarimax_model
-
-# AGGIUNGI: Importa l'MLP
+from algorithms.XGBoost import fit_xgboost_model, xgboost_grid_search
 from algorithms.mlp_torch import fit_mlp_model
 
 df = pd.read_csv(r"demand-forecasting-restaurant\dataset\chiusure_di giornata_autentiko_beach_estate_2024.csv", sep=';')
@@ -151,6 +150,42 @@ print("\nBest MLP params:", best_params)
 print(f"Validation predictions shape: {val_pred.shape}")
 print(f"Test predictions shape: {test_pred.shape}")
 print(f"Future forecast shape: {future_pred.shape}")
+
+# ------- XGBOOST --------
+
+print("\n================= XGBOOST SU 'Numero ospiti' =================")
+
+xgb_data = get_preprocessed_dict(
+    df,
+    'Numero ospiti',
+    apply_boxcox=False,
+    apply_kalman=False,
+    apply_standardization=True,
+    seasonal_lag=seasonal_period,
+)
+
+# Grid search: puoi cambiare i valori!
+grid_results, best_config, best_model = xgboost_grid_search(
+    xgb_data,
+    look_back_grid=[7, 14, 21, 30, 45, 60],
+    n_estimators_grid=[10, 15, 25, 35, 40, 50, 75, 100],
+)
+
+print("\n--- XGBoost grid search results ---")
+print(grid_results.head())
+
+# Lancia il modello migliore trovato
+model_xgb, val_pred_xgb, test_pred_xgb, future_pred_xgb = fit_xgboost_model(
+    xgb_data,
+    look_back=best_config[0],
+    n_estimators=best_config[1],
+    col_name='Numero ospiti',
+)
+
+print("\nBest XGBoost config:", best_config)
+print(f"Validation predictions shape: {val_pred_xgb.shape}")
+print(f"Test predictions shape: {test_pred_xgb.shape}")
+print(f"Future forecast shape: {future_pred_xgb.shape}")
 
 
 # --------- FINE MAIN ---------
