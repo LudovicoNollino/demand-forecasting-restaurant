@@ -216,35 +216,86 @@ def fit_mlp_model(
 
     # Plot risultati
     plt.figure(figsize=(16, 9))
-    plt.subplot(2, 1, 1)
-    idx = pd.concat([data_dict["train_orig"], data_dict["val_orig"], data_dict["test_orig"]]).index
-    plt.plot(data_dict["train_orig"].index, data_dict["train_orig"], label="Train Obs", color="blue")
-    plt.plot(data_dict["val_orig"].index, data_dict["val_orig"], label="Val Obs", color="orange")
-    plt.plot(data_dict["test_orig"].index, data_dict["test_orig"], label="Test Obs", color="green")
-    plt.plot(idx[window_size:window_size+len(y_train_inv)], y_train_inv, '--', color="blue", label="Train Predict")
-    plt.plot(idx[len(data_dict["train"])+window_size:len(data_dict["train"])+window_size+len(y_val_inv)], y_val_inv, '--', color="orange", label="Val Predict")
-    plt.plot(idx[len(data_dict["train"])+len(data_dict["val"])+window_size:len(data_dict["train"])+len(data_dict["val"])+window_size+len(y_test_inv)], y_test_inv, '--', color="green", label="Test Predict")
-    # Future
-    last_idx = data_dict["test_orig"].index[-1]
-    if isinstance(last_idx, pd.Timestamp):
-        future_idx = pd.date_range(start=last_idx + pd.Timedelta(days=1), periods=future_steps)
-    else:
-        future_idx = np.arange(last_idx + 1, last_idx + 1 + future_steps)
-    plt.plot(future_idx, future_forecast_inv, 'r--', label="Future Forecast (orig)")
-    plt.title(f"{col_name} - Original Scale (val/test e 30gg futuri) [MLP]")
-    plt.legend(); plt.grid(True)
+    alpha_zone = 0.12
 
+    # --- ORIGINAL SCALE ---
+    plt.subplot(2, 1, 1)
+
+    # Indici temporali originali concatenati
+    idx = pd.concat([data_dict["train_orig"], data_dict["val_orig"], data_dict["test_orig"]]).index
+
+    # Zone di background per validation/test/future
+    if len(data_dict["val_orig"]) > 0:
+        plt.axvspan(data_dict["val_orig"].index[0], data_dict["val_orig"].index[-1], color='orange', alpha=alpha_zone, label='Validation Period')
+    if len(data_dict["test_orig"]) > 0:
+        plt.axvspan(data_dict["test_orig"].index[0], data_dict["test_orig"].index[-1], color='green', alpha=alpha_zone, label='Test Period')
+    # Future
+    all_idx = idx
+    if isinstance(all_idx, pd.DatetimeIndex):
+        last_idx = all_idx[-1]
+    else:
+        last_idx = pd.to_datetime(all_idx[-1])
+    future_idx = pd.date_range(start=last_idx + pd.Timedelta(days=1), periods=future_steps)
+    if len(future_idx) > 0:
+        plt.axvspan(future_idx[0], future_idx[-1], color='red', alpha=alpha_zone, label='Future Forecast Period')
+
+    # Serie osservate
+    plt.plot(data_dict["train_orig"].index, data_dict["train_orig"], color='blue', label='Train Obs', linewidth=2)
+    plt.plot(data_dict["val_orig"].index, data_dict["val_orig"], color='orange', label='Val Obs', linewidth=2)
+    plt.plot(data_dict["test_orig"].index, data_dict["test_orig"], color='green', label='Test Obs', linewidth=2)
+
+    # Previsioni (allineamento corretto)
+    idx_train_pred = data_dict["train_orig"].index[-len(y_train_inv):]
+    idx_val_pred = data_dict["val_orig"].index[-len(y_val_inv):]
+    idx_test_pred = data_dict["test_orig"].index[-len(y_test_inv):]
+    plt.plot(idx_train_pred, y_train_inv, '--', color="blue", label="Train Forecast", linewidth=2.5)
+    plt.plot(idx_val_pred, y_val_inv, '--', color="red", label="Val Forecast", linewidth=2.5)
+    plt.plot(idx_test_pred, y_test_inv, '--', color="purple", label="Test Forecast", linewidth=2.5)
+    plt.plot(future_idx, future_forecast_inv, '-.', color='black', label="Future Forecast", linewidth=2.5)
+
+    # Split verticale tra storico e futuro
+    plt.axvline(data_dict["train_orig"].index[-1], color="black", linestyle=":", label="Split Train/Val")
+    plt.axvline(data_dict["val_orig"].index[-1], color="black", linestyle=":", label="Split Val/Test")
+    plt.axvline(data_dict["test_orig"].index[-1], color="black", linestyle=":", label="Split Test/Future")
+
+    plt.title(f"{col_name} - Original Scale")
+    plt.legend(loc='upper left', fontsize=10)
+    plt.grid(True)
+
+    # --- PROCESSED SCALE ---
     plt.subplot(2, 1, 2)
+
     idx_proc = np.arange(len(series_proc))
-    plt.plot(idx_proc[:len(data_dict["train"])], series_proc[:len(data_dict["train"])], label="Train Obs (proc)", color="blue")
-    plt.plot(idx_proc[len(data_dict["train"]):len(data_dict["train"])+len(data_dict["val"])], series_proc[len(data_dict["train"]):len(data_dict["train"])+len(data_dict["val"])], label="Val Obs (proc)", color="orange")
-    plt.plot(idx_proc[len(data_dict["train"])+len(data_dict["val"]):], series_proc[len(data_dict["train"])+len(data_dict["val"]):], label="Test Obs (proc)", color="green")
-    plt.plot(idx_proc[window_size:window_size+len(y_tr_pred)], y_tr_pred, '--', color="blue", label="Train Predict (proc)")
-    plt.plot(idx_proc[len(data_dict["train"])+window_size:len(data_dict["train"])+window_size+len(y_vl_pred)], y_vl_pred, '--', color="orange", label="Val Predict (proc)")
-    plt.plot(idx_proc[len(data_dict["train"])+len(data_dict["val"])+window_size:len(data_dict["train"])+len(data_dict["val"])+window_size+len(y_ts_pred)], y_ts_pred, '--', color="green", label="Test Predict (proc)")
-    plt.plot(np.arange(len(series_proc), len(series_proc)+future_steps), future_forecast, 'r--', label="Future Forecast (proc)")
-    plt.title(f"{col_name} - Processed Scale (val/test e 30gg futuri) [MLP]")
-    plt.legend(); plt.grid(True)
+    # Zone di background per validation/test/future
+    if n_val > 0:
+        plt.axvspan(idx_proc[n_train], idx_proc[n_train + n_val - 1], color='orange', alpha=alpha_zone)
+    if n_test > 0:
+        plt.axvspan(idx_proc[n_train + n_val], idx_proc[n_train + n_val + n_test - 1], color='green', alpha=alpha_zone)
+    if future_steps > 0:
+        plt.axvspan(idx_proc[-1] + 1, idx_proc[-1] + future_steps, color='red', alpha=alpha_zone)
+
+    # Serie osservate (processed)
+    plt.plot(idx_proc[:n_train], series_proc[:n_train], color='blue', label='Train Obs (proc)', linewidth=2)
+    plt.plot(idx_proc[n_train:n_train + n_val], series_proc[n_train:n_train + n_val], color='orange', label='Val Obs (proc)', linewidth=2)
+    plt.plot(idx_proc[n_train + n_val:], series_proc[n_train + n_val:], color='green', label='Test Obs (proc)', linewidth=2)
+
+    # Previsioni (processed)
+    idx_tr_pred_proc = idx_proc[window_size:window_size+len(y_tr_pred)]
+    idx_vl_pred_proc = idx_proc[n_train + window_size:n_train + window_size + len(y_vl_pred)]
+    idx_ts_pred_proc = idx_proc[n_train + n_val + window_size:n_train + n_val + window_size + len(y_ts_pred)]
+    plt.plot(idx_tr_pred_proc, y_tr_pred, '--', color="blue", label="Train Forecast (proc)", linewidth=2.5)
+    plt.plot(idx_vl_pred_proc, y_vl_pred, '--', color="red", label="Val Forecast (proc)", linewidth=2.5)
+    plt.plot(idx_ts_pred_proc, y_ts_pred, '--', color="purple", label="Test Forecast (proc)", linewidth=2.5)
+    plt.plot(np.arange(len(series_proc), len(series_proc) + future_steps), future_forecast, '-.', color='black', label="Future Forecast (proc)", linewidth=2.5)
+
+    # Split verticali
+    plt.axvline(idx_proc[n_train - 1], color="black", linestyle=":", label="Split Train/Val")
+    plt.axvline(idx_proc[n_train + n_val - 1], color="black", linestyle=":", label="Split Val/Test")
+    plt.axvline(idx_proc[n_train + n_val + n_test - 1], color="black", linestyle=":", label="Split Test/Future")
+
+    plt.title(f"{col_name} - Processed Scale")
+    plt.legend(loc='upper left', fontsize=10)
+    plt.grid(True)
     plt.tight_layout()
     plt.show()
 
