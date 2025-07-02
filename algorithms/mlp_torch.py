@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 from dataset_manipulation.preprocessing import inverse_transform_predictions_forecast
 
@@ -20,11 +19,14 @@ class SimpleMLP(nn.Module):
     def forward(self, x):
         return self.layers(x)
 
-def create_sliding_windows(series, window_size):
+def create_sliding_windows_with_features(series, features, window_size):
     X, y = [], []
     for i in range(len(series) - window_size):
-        X.append(series[i:i+window_size])
-        y.append(series[i+window_size])
+        window = series[i:i+window_size]
+        target_idx = i + window_size
+        feat = features.iloc[target_idx].values if isinstance(features, pd.DataFrame) else features[target_idx]
+        X.append(np.concatenate([window, feat]))
+        y.append(series[target_idx])
     return np.array(X), np.array(y)
 
 def invert_preds(preds, preprocess_params):
@@ -105,9 +107,8 @@ def mlp_grid_search(
                             n_epochs=n_epochs,
                             batch_size=batch_size,
                             print_every=print_every,
-                            verbose=False  # Nessun print durante gridsearch, sennò è illeggibile!
+                            verbose=False
                         )
-                        # Validation loss finale
                         model.eval()
                         X_vl = torch.FloatTensor(X_val)
                         y_vl = torch.FloatTensor(y_val).unsqueeze(1)
@@ -144,18 +145,23 @@ def fit_mlp_model(
     col_name="Serie",
     verbose=True
 ):
-    # Preprocessing & Windowing
+    # --- ESTRAI SERIE E FEATURE ---
     series_proc = pd.concat([data_dict["train"], data_dict["val"], data_dict["test"]]).values.astype(np.float32)
     n_train, n_val, n_test = len(data_dict["train"]), len(data_dict["val"]), len(data_dict["test"])
     preprocess_params = data_dict['preprocess_params']
 
-    X_train, y_train = create_sliding_windows(series_proc[:n_train+window_size], window_size)
-    X_val, y_val = create_sliding_windows(series_proc[n_train:n_train+n_val+window_size], window_size)
-    X_test, y_test = create_sliding_windows(series_proc[n_train+n_val:], window_size)
-    if verbose:
-        print(f"Train samples shape: {X_train.shape}, Val: {X_val.shape}, Test: {X_test.shape}, Window: {window_size}")
+    if "features" in data_dict and data_dict["features"] is not None:
+        features = data_dict["features"].reset_index(drop=True).astype(np.float32)
+    else:
+        features = pd.DataFrame(np.zeros((len(series_proc), 0)), index=range(len(series_proc)))
 
-    # Grid search o modello singolo
+    # --- SLIDING WINDOW SU SERIE + FEATURE TARGET ---
+    X_train, y_train = create_sliding_windows_with_features(series_proc[:n_train+window_size], features.iloc[:n_train+window_size], window_size)
+    X_val, y_val = create_sliding_windows_with_features(series_proc[n_train:n_train+n_val+window_size], features.iloc[n_train:n_train+n_val+window_size], window_size)
+    X_test, y_test = create_sliding_windows_with_features(series_proc[n_train+n_val:], features.iloc[n_train+n_val:], window_size)
+    if verbose:
+        print(f"Train samples shape: {X_train.shape}, Val: {X_val.shape}, Test: {X_test.shape}, Window: {window_size}, Feature shape: {features.shape}")
+
     if grid_search and grid_params is not None:
         model, best_params, grid = mlp_grid_search(
             X_train, y_train, X_val, y_val, **grid_params
@@ -177,126 +183,55 @@ def fit_mlp_model(
 
     # Predict e inversione scala
     model.eval()
-    X_tr = torch.FloatTensor(X_train)
     X_vl = torch.FloatTensor(X_val)
     X_ts = torch.FloatTensor(X_test)
     with torch.no_grad():
-        y_tr_pred = model(X_tr).numpy().flatten()
         y_vl_pred = model(X_vl).numpy().flatten()
         y_ts_pred = model(X_ts).numpy().flatten()
-    y_train_inv = invert_preds(y_tr_pred, preprocess_params)
     y_val_inv = invert_preds(y_vl_pred, preprocess_params)
     y_test_inv = invert_preds(y_ts_pred, preprocess_params)
-
-    # RMSE e AIC
-    train_rmse = mean_squared_error(y_train, y_tr_pred) ** 0.5
-    val_rmse = mean_squared_error(y_val, y_vl_pred) ** 0.5
-    k = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    rss = np.sum((y_train - y_tr_pred) ** 2)
-    aic = len(y_train) * np.log(rss / len(y_train)) + 2 * k
-
-    print(f"Train RMSE: {train_rmse:.4f}")
-    print(f"Val   RMSE: {val_rmse:.4f}")
-    print(f"AIC: {aic:.2f}")
+    
+    val_pred_orig = pd.Series(y_val_inv, index=data_dict["val_orig"].index[-len(y_val_inv):])
+    test_pred_orig = pd.Series(y_test_inv, index=data_dict["test_orig"].index[-len(y_test_inv):])
 
     # Forecast autoregressivo futuro
     input_seq = series_proc[-window_size:].copy()
+    last_feat_idx = len(series_proc) - window_size
     future_forecast = []
     model.eval()
     with torch.no_grad():
-        for _ in range(future_steps):
-            inp = torch.tensor(input_seq, dtype=torch.float32).unsqueeze(0)
+        for i in range(future_steps):
+            if last_feat_idx + i < len(features):
+                feat_next = features.iloc[last_feat_idx + i].values
+            else:
+                feat_next = np.zeros(features.shape[1])
+            inp = np.concatenate([input_seq, feat_next])
+            inp = torch.tensor(inp, dtype=torch.float32).unsqueeze(0)
             pred = model(inp).item()
             future_forecast.append(pred)
             input_seq = np.roll(input_seq, -1)
             input_seq[-1] = pred
-    print("Forecast autoregressivo futuro (30 passi):")
-    print(np.array(future_forecast))
-    future_forecast_inv = invert_preds(np.array(future_forecast), preprocess_params)
-
-    # Plot risultati
-    plt.figure(figsize=(16, 9))
-    alpha_zone = 0.12
-
-    # --- ORIGINAL SCALE ---
-    plt.subplot(2, 1, 1)
-
-    # Indici temporali originali concatenati
-    idx = pd.concat([data_dict["train_orig"], data_dict["val_orig"], data_dict["test_orig"]]).index
-
-    # Zone di background per validation/test/future
-    if len(data_dict["val_orig"]) > 0:
-        plt.axvspan(data_dict["val_orig"].index[0], data_dict["val_orig"].index[-1], color='orange', alpha=alpha_zone, label='Validation Period')
-    if len(data_dict["test_orig"]) > 0:
-        plt.axvspan(data_dict["test_orig"].index[0], data_dict["test_orig"].index[-1], color='green', alpha=alpha_zone, label='Test Period')
-    # Future
-    all_idx = idx
-    if isinstance(all_idx, pd.DatetimeIndex):
-        last_idx = all_idx[-1]
+    future_forecast = np.array(future_forecast)
+    future_forecast_inv = invert_preds(future_forecast, preprocess_params)
+    
+    test_idx = data_dict["test_orig"].index
+    last_idx = test_idx[-1]
+    if isinstance(last_idx, pd.Timestamp):
+        future_idx_orig = pd.date_range(start=last_idx + pd.Timedelta(days=1), periods=future_steps)
     else:
-        last_idx = pd.to_datetime(all_idx[-1])
-    future_idx = pd.date_range(start=last_idx + pd.Timedelta(days=1), periods=future_steps)
-    if len(future_idx) > 0:
-        plt.axvspan(future_idx[0], future_idx[-1], color='red', alpha=alpha_zone, label='Future Forecast Period')
+        future_idx_orig = np.arange(last_idx + 1, last_idx + 1 + future_steps)
+    future_pred_orig = pd.Series(future_forecast_inv, index=future_idx_orig)
 
-    # Serie osservate
-    plt.plot(data_dict["train_orig"].index, data_dict["train_orig"], color='blue', label='Train Obs', linewidth=2)
-    plt.plot(data_dict["val_orig"].index, data_dict["val_orig"], color='orange', label='Val Obs', linewidth=2)
-    plt.plot(data_dict["test_orig"].index, data_dict["test_orig"], color='green', label='Test Obs', linewidth=2)
+    # Chiama solo plot originale
+    from plotter import plot_forecasting
+    plot_forecasting(
+        col_name=col_name,
+        y_train_orig=data_dict["train_orig"],
+        y_val_orig=data_dict["val_orig"],
+        y_test_orig=data_dict["test_orig"],
+        val_pred_orig=val_pred_orig,
+        test_pred_orig=test_pred_orig,
+        future_pred_orig=future_pred_orig
+    )
 
-    # Previsioni (allineamento corretto)
-    idx_train_pred = data_dict["train_orig"].index[-len(y_train_inv):]
-    idx_val_pred = data_dict["val_orig"].index[-len(y_val_inv):]
-    idx_test_pred = data_dict["test_orig"].index[-len(y_test_inv):]
-    plt.plot(idx_train_pred, y_train_inv, '--', color="blue", label="Train Forecast", linewidth=2.5)
-    plt.plot(idx_val_pred, y_val_inv, '--', color="red", label="Val Forecast", linewidth=2.5)
-    plt.plot(idx_test_pred, y_test_inv, '--', color="purple", label="Test Forecast", linewidth=2.5)
-    plt.plot(future_idx, future_forecast_inv, '-.', color='black', label="Future Forecast", linewidth=2.5)
-
-    # Split verticale tra storico e futuro
-    plt.axvline(data_dict["train_orig"].index[-1], color="black", linestyle=":", label="Split Train/Val")
-    plt.axvline(data_dict["val_orig"].index[-1], color="black", linestyle=":", label="Split Val/Test")
-    plt.axvline(data_dict["test_orig"].index[-1], color="black", linestyle=":", label="Split Test/Future")
-
-    plt.title(f"{col_name} - Original Scale")
-    plt.legend(loc='upper left', fontsize=10)
-    plt.grid(True)
-
-    # --- PROCESSED SCALE ---
-    plt.subplot(2, 1, 2)
-
-    idx_proc = np.arange(len(series_proc))
-    # Zone di background per validation/test/future
-    if n_val > 0:
-        plt.axvspan(idx_proc[n_train], idx_proc[n_train + n_val - 1], color='orange', alpha=alpha_zone)
-    if n_test > 0:
-        plt.axvspan(idx_proc[n_train + n_val], idx_proc[n_train + n_val + n_test - 1], color='green', alpha=alpha_zone)
-    if future_steps > 0:
-        plt.axvspan(idx_proc[-1] + 1, idx_proc[-1] + future_steps, color='red', alpha=alpha_zone)
-
-    # Serie osservate (processed)
-    plt.plot(idx_proc[:n_train], series_proc[:n_train], color='blue', label='Train Obs (proc)', linewidth=2)
-    plt.plot(idx_proc[n_train:n_train + n_val], series_proc[n_train:n_train + n_val], color='orange', label='Val Obs (proc)', linewidth=2)
-    plt.plot(idx_proc[n_train + n_val:], series_proc[n_train + n_val:], color='green', label='Test Obs (proc)', linewidth=2)
-
-    # Previsioni (processed)
-    idx_tr_pred_proc = idx_proc[window_size:window_size+len(y_tr_pred)]
-    idx_vl_pred_proc = idx_proc[n_train + window_size:n_train + window_size + len(y_vl_pred)]
-    idx_ts_pred_proc = idx_proc[n_train + n_val + window_size:n_train + n_val + window_size + len(y_ts_pred)]
-    plt.plot(idx_tr_pred_proc, y_tr_pred, '--', color="blue", label="Train Forecast (proc)", linewidth=2.5)
-    plt.plot(idx_vl_pred_proc, y_vl_pred, '--', color="red", label="Val Forecast (proc)", linewidth=2.5)
-    plt.plot(idx_ts_pred_proc, y_ts_pred, '--', color="purple", label="Test Forecast (proc)", linewidth=2.5)
-    plt.plot(np.arange(len(series_proc), len(series_proc) + future_steps), future_forecast, '-.', color='black', label="Future Forecast (proc)", linewidth=2.5)
-
-    # Split verticali
-    plt.axvline(idx_proc[n_train - 1], color="black", linestyle=":", label="Split Train/Val")
-    plt.axvline(idx_proc[n_train + n_val - 1], color="black", linestyle=":", label="Split Val/Test")
-    plt.axvline(idx_proc[n_train + n_val + n_test - 1], color="black", linestyle=":", label="Split Test/Future")
-
-    plt.title(f"{col_name} - Processed Scale")
-    plt.legend(loc='upper left', fontsize=10)
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-    return model, best_params, grid, y_val_inv, y_test_inv, future_forecast_inv
+    return model, best_params, grid, val_pred_orig, test_pred_orig, future_pred_orig
