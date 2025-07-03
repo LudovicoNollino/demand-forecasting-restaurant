@@ -115,7 +115,7 @@ Model performance is evaluated using:
 - **MAE** (Mean Absolute Error)
 - **MAPE** (Mean Absolute Percentage Error)
 
-All results, metrics, and comparisons are saved in Markdown (`model_results_summary_TOTAL.md`) for easy sharing and consultation.
+All results, metrics, and comparisons are saved in Markdown (`global_report.md`) for easy sharing and consultation.
 
 ---
 
