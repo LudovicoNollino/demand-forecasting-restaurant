@@ -22,7 +22,7 @@ def plot_forecasting(
     plt.plot(y_val_orig.index, y_val_orig, color='orange', label='Val Obs', linewidth=2)
     plt.plot(y_test_orig.index, y_test_orig, color='green', label='Test Obs', linewidth=2)
 
-    # Previsioni
+    # Previsions
     if val_pred_orig is not None and len(val_pred_orig) > 0:
         plt.plot(val_pred_orig.index, val_pred_orig, '--', color='red', label='Val Forecast', linewidth=2.5)
     if test_pred_orig is not None and len(test_pred_orig) > 0:

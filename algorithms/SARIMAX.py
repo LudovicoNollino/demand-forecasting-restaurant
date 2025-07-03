@@ -97,7 +97,7 @@ def fit_sarimax_model(
     else:
         exog_train = exog_val = exog_test = exog_trainval = exog_full = None
 
-    # 1. Fit su train → val
+    # 1. Fit on train → validation
     model_train = SARIMAX(y_train, order=order, seasonal_order=seasonal_order, 
                           enforce_stationarity=False, enforce_invertibility=False,
                           exog=exog_train)
@@ -105,7 +105,7 @@ def fit_sarimax_model(
     val_pred = res_train.get_forecast(steps=len(y_val), exog=exog_val).predicted_mean
     val_pred_orig = maybe_inverse(val_pred)
 
-    # 2. Fit su train+val → test
+    # 2. Fit on train+validation → test
     y_trainval = pd.concat([y_train, y_val])
     model_tv = SARIMAX(y_trainval, order=order, seasonal_order=seasonal_order,
                        enforce_stationarity=False, enforce_invertibility=False,
@@ -114,21 +114,24 @@ def fit_sarimax_model(
     test_pred = res_tv.get_forecast(steps=len(y_test), exog=exog_test).predicted_mean
     test_pred_orig = maybe_inverse(test_pred)
 
-    # 3. Fit su tutti i dati → forecast futuro
+    # 3. Fit on all data → future forecast
     y_full = pd.concat([y_train, y_val, y_test])
     model_full = SARIMAX(y_full, order=order, seasonal_order=seasonal_order,
                          enforce_stationarity=False, enforce_invertibility=False,
                          exog=exog_full)
     res_full = model_full.fit(disp=False)
     if exog_full is not None:
+        # Prepare future exogenous data
+        # Use the last row of exog_full repeated for future_steps
         last_exog = exog_full.iloc[[-1]]
         exog_future = pd.concat([last_exog]*future_steps, ignore_index=True)
     else:
         exog_future = None
+    
+    # Forecast future values using the exogenous data used above
     future_pred_proc = res_full.get_forecast(steps=future_steps, exog=exog_future).predicted_mean
     future_pred_orig = maybe_inverse(future_pred_proc)
 
-    # Indici futuri
     test_idx = data_dict["test_orig"].index
     last_idx = test_idx[-1]
     if isinstance(last_idx, pd.Timestamp):
@@ -136,12 +139,10 @@ def fit_sarimax_model(
     else:
         future_idx = np.arange(last_idx + 1, last_idx + 1 + future_steps)
 
-    # Rendi tutte le predizioni delle Series con indice corretto (solo ORIG)
     val_pred_orig = pd.Series(np.array(val_pred_orig), index=y_val_orig.index)
     test_pred_orig = pd.Series(np.array(test_pred_orig), index=y_test_orig.index)
     future_pred_orig = pd.Series(np.array(future_pred_orig), index=future_idx)
 
-    # Plot solo originale
     from plotter import plot_forecasting
     plot_forecasting(
         col_name=col_name,

@@ -3,8 +3,8 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, mean_absolu
 
 def calc_metrics(y_true, y_pred):
     """
-    Calcola MAPE, MAE, RMSE allineando sempre in coda le serie con la stessa lunghezza minima.
-    Restituisce un dizionario {metric_name: value}
+    Calculates MAPE, MAE, RMSE always aligning series with the same minimum length at the end.
+    Returns a dictionary {metric_name: value}
     """
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
@@ -20,7 +20,7 @@ def calc_metrics(y_true, y_pred):
 
 def get_metrics_table(val_true, val_pred, test_true, test_pred, round_n=4):
     """
-    Restituisce la tabella HTML delle metriche per validation e test.
+    Returns an HTML table with evaluation metrics for validation and test sets.
     """
     val_metrics = calc_metrics(val_true, val_pred)
     test_metrics = calc_metrics(test_true, test_pred)

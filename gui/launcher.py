@@ -140,7 +140,7 @@ class Launcher(QWidget):
             f"Kalman={best_preproc['apply_kalman']}, Standard={best_preproc['apply_standardization']}</i>"
         )
         
-        # Prepare features for modeling
+        # Prepare features to the preprocessed series for modeling
         feature_cols = [c for c in df.columns if c.startswith('dow_')] + ['is_weekend']
         features = df.loc[proc.index, feature_cols].copy()
         features = features.astype(np.float32)

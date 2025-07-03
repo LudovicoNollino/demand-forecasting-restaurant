@@ -37,6 +37,7 @@ def invert_preds(preds, preprocess_params):
         return inverse_transform_predictions_forecast(pd.Series(preds), preprocess_params).values
     return preds
 
+# Train the MLP model with given parameters
 def train_mlp_model(X_train, y_train, X_val, y_val, hidden_dim1, hidden_dim2, lr=0.001,
                     activation='relu', n_epochs=200, batch_size=1, print_every=20, verbose=True):
     model = SimpleMLP(X_train.shape[1], hidden_dim1, hidden_dim2, activation=activation)
@@ -48,11 +49,13 @@ def train_mlp_model(X_train, y_train, X_val, y_val, hidden_dim1, hidden_dim2, lr
     y_vl = torch.FloatTensor(y_val).unsqueeze(1)
     best_weights = None
     best_val_loss = np.inf
-
+    
+    # Training loop
     for epoch in range(n_epochs):
         model.train()
         perm = np.random.permutation(len(X_tr))
         train_loss = 0.0
+        # Iterate over batches
         for i in range(0, len(X_tr), batch_size):
             idx = perm[i:i+batch_size]
             Xb = X_tr[idx]
@@ -65,6 +68,7 @@ def train_mlp_model(X_train, y_train, X_val, y_val, hidden_dim1, hidden_dim2, lr
             train_loss += loss.item() * len(Xb)
         train_loss /= len(X_tr)
         model.eval()
+        # Validation loss 
         with torch.no_grad():
             val_pred = model(X_vl)
             val_loss = loss_fn(val_pred, y_vl).item()
@@ -140,11 +144,12 @@ def fit_mlp_model(
     future_steps=30,
     grid_search=False,
     grid_params=None,
-    col_name="Serie",
+    col_name=None,
     verbose=True
 ):
     # --- EXTRACT SERIES AND FEATURES ---
     series_proc = pd.concat([data_dict["train"], data_dict["val"], data_dict["test"]]).values.astype(np.float32)
+    # Calculate the number of elements in each set
     n_train, n_val, n_test = len(data_dict["train"]), len(data_dict["val"]), len(data_dict["test"])
     preprocess_params = data_dict['preprocess_params']
 
@@ -194,6 +199,7 @@ def fit_mlp_model(
 
     # Future Autoregressive Forecasting
     input_seq = series_proc[-window_size:].copy()
+    # use the last window_size elements as input
     last_feat_idx = len(series_proc) - window_size
     future_forecast = []
     model.eval()

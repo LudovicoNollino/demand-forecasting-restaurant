@@ -40,6 +40,7 @@ def xgboost_grid_search(
                 model.fit(X_train, y_train)
 
                 # Rolling forecast validation
+                # In every step use the last predictions as input
                 val_forecast = []
                 input_seq = list(series_proc[n_train-look_back:n_train])
                 for t in range(n_val):
@@ -89,7 +90,7 @@ def fit_xgboost_model(
     params = data_dict['preprocess_params']
     features = data_dict['features'].reset_index(drop=True).astype(np.float32)
 
-    # TRAIN/VAL per grid search
+    # Fit on train and model configuration
     X_train, y_train = create_sliding_window_with_features(
         series_proc[:n_train+look_back], features.iloc[:n_train+look_back], look_back
     )
