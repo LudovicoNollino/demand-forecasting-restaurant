@@ -19,29 +19,27 @@ All models are automatically evaluated, compared, and documented in a Markdown r
 
 ---
 
+
 ## 📁 Repository Structure
 
+```text
 demand-forecasting-restaurant/
-│
-├── algorithms/ # Model implementations (SARIMAX, MLP, XGBoost)
-│ ├── SARIMAX.py
-│ ├── mlp_torch.py
-│ └── XGBoost.py
-│
-├── dataset/ # Original CSV dataset
-│ └── chiusure_di_giornata_autentiko_beach_estate_2024.csv
-│
-├── dataset_manipulation/ # Preprocessing and feature engineering
-│ └── preprocessing.py
-│
-├── gui/ # PyQt5 interactive application
-│ └── launcher.py
-│
-├── benchmark.py # Report generation (Markdown)
-├── batch_report.py # Batch pipeline for automatic reporting
-├── utils.py # Utility functions (metrics, tables, etc.)
-├── requirements.txt # Python dependencies
-├── README.md # This file!
+├── algorithms/               # Model implementations (SARIMAX, MLP, XGBoost)
+│   ├── SARIMAX.py
+│   ├── mlp_torch.py
+│   └── XGBoost.py
+├── dataset/                  # Original CSV dataset
+│   └── chiusure_di_giornata_autentiko_beach_estate_2024.csv
+├── dataset_manipulation/     # Preprocessing and feature engineering
+│   └── preprocessing.py
+├── gui/                      # PyQt5 interactive application
+│   └── launcher.py
+├── benchmark.py              # Report generation (Markdown)
+├── batch_report.py           # Batch pipeline for automatic reporting
+├── utils.py                  # Utility functions (metrics, tables, etc.)
+├── requirements.txt          # Python dependencies
+├── README.md                 # This file!
+```
 
 ---
 
