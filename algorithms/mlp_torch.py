@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_squared_error
 from dataset_manipulation.preprocessing import inverse_transform_predictions_forecast
 
 class SimpleMLP(nn.Module):

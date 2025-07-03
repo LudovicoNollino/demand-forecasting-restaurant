@@ -1,18 +1,10 @@
 import numpy as np
 import pandas as pd
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-from sklearn.metrics import mean_squared_error
 from dataset_manipulation.preprocessing import inverse_transform_predictions_forecast
 import warnings
 
 warnings.filterwarnings("ignore")
-
-# def calc_metrics(y_true, y_pred):
-#     bias = np.mean(y_pred - y_true)
-#     mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
-#     mad = np.mean(np.abs(y_pred - y_true))
-#     rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-#     return {"BIAS": bias, "MAPE": mape, "MAD": mad, "RMSE": rmse}
 
 def sarimax_grid_search(
     data_dict,
@@ -159,7 +151,6 @@ def fit_sarimax_model(
         val_pred_orig=val_pred_orig,
         test_pred_orig=test_pred_orig,
         future_pred_orig=future_pred_orig
-        # tutti gli altri parametri sono ignorati dal plotter
     )
 
     return res_full, val_pred_orig, test_pred_orig

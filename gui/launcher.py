@@ -14,6 +14,7 @@ from algorithms.XGBoost import fit_xgboost_model, xgboost_grid_search
 from statsmodels.tsa.stattools import adfuller
 from scipy.stats import shapiro
 from utils import get_metrics_table
+from batch_report import run_full_report
 
 class Launcher(QWidget):
     def __init__(self):
@@ -35,6 +36,9 @@ class Launcher(QWidget):
         self.alg_combo.addItems(["SARIMAX", "XGBoost", "MLP"])
         self.run_btn = QPushButton("Run Analysis")
         self.run_btn.clicked.connect(self.run_analysis)
+        
+        self.report_btn = QPushButton("Generate Global Report")
+        self.report_btn.clicked.connect(run_full_report)
 
         self.diagnostica_label = QLabel("")
         self.diagnostica_label.setWordWrap(True)
@@ -46,9 +50,22 @@ class Launcher(QWidget):
         layout.addWidget(self.alg_label)
         layout.addWidget(self.alg_combo)
         layout.addWidget(self.run_btn)
+        layout.addWidget(self.report_btn)
         layout.addWidget(QLabel("Step by Step Diagnostics:"))
         layout.addWidget(self.diagnostica_label)
         self.setLayout(layout)
+    
+    def run_full_report(self):
+        reply = QMessageBox.question(
+            self,
+            "Generate Global Report",
+            "This will generate a comprehensive report of all analyses. Proceed?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.run_full_report()
+        else:
+            QMessageBox.information(self, "Cancelled", "Global report generation cancelled.")
 
     def get_best_preprocessing(self, col, algorithm):
         
@@ -61,7 +78,7 @@ class Launcher(QWidget):
                 return dict(apply_boxcox=True, apply_kalman=True, apply_standardization=False)
         elif col == "Numero ospiti":
             if algorithm == "MLP":
-                return dict(apply_boxcox=False, apply_kalman=False, apply_standardization=True)
+                return dict(apply_boxcox=True, apply_kalman=True, apply_standardization=True)
             elif algorithm == "SARIMAX":
                 return dict(apply_boxcox=False, apply_kalman=False, apply_standardization=False)
             elif algorithm == "XGBoost":
@@ -150,8 +167,8 @@ class Launcher(QWidget):
         val_orig = orig.iloc[n_train:n_train + n_val].copy()
         test_orig = orig.iloc[n_train + n_val:].copy()
         
-        print("MEDIA test:", np.mean(test_orig))
-        print("DEVIAZIONE STANDARD test:", np.std(test_orig))
+        print("Test MEAN:", np.mean(test_orig))
+        print("Test STANDARD DEVIATION:", np.std(test_orig))
 
         data_dict = {
             "train": train,
@@ -194,7 +211,7 @@ class Launcher(QWidget):
 
         elif algorithm == "MLP":
             print("Launching MLP")
-            model, best_params, grid, val_pred, test_pred, future_pred = fit_mlp_model(
+            model_mlp, best_params, grid, val_pred, test_pred, future_pred = fit_mlp_model(
                 data_dict,
                 window_size=7,
                 hidden_dim1=16, hidden_dim2=8,
@@ -245,7 +262,7 @@ class Launcher(QWidget):
 
         elif algorithm == "XGBoost":
             print("Launching XGBoost")
-            best_config = xgboost_grid_search(
+            grid_results, best_config, best_model = xgboost_grid_search(
                 data_dict,
                 look_back_grid=[60],
                 n_estimators_grid=[40],
@@ -256,21 +273,21 @@ class Launcher(QWidget):
                 n_estimators=best_config[1],
                 col_name=col,
             )
-            # grid_html = ""
-            # if grid_results is not None and not grid_results.empty:
-            #     grid_html = "<br><b>XGBoost Grid Search (first 5 tested parameters):</b><br><table border='1' cellpadding='3'><tr>"
-            #     for k in grid_results.columns:
-            #         grid_html += f"<th>{k}</th>"
-            #     grid_html += "</tr>"
-            #     for _, row in grid_results.head().iterrows():
-            #         grid_html += "<tr>"
-            #         for v in row.values:
-            #             grid_html += f"<td>{v:.4f}" if isinstance(v, float) else f"<td>{v}"
-            #             grid_html += "</td>"
-            #         grid_html += "</tr>"
-            #     grid_html += "</table>"
-            # else:
-            #     grid_html = "<br><b>No grid search performed (fixed parameters).</b>"
+            grid_html = ""
+            if grid_results is not None and not grid_results.empty:
+                grid_html = "<br><b>XGBoost Grid Search (first 5 tested parameters):</b><br><table border='1' cellpadding='3'><tr>"
+                for k in grid_results.columns:
+                    grid_html += f"<th>{k}</th>"
+                grid_html += "</tr>"
+                for _, row in grid_results.head().iterrows():
+                    grid_html += "<tr>"
+                    for v in row.values:
+                        grid_html += f"<td>{v:.4f}" if isinstance(v, float) else f"<td>{v}"
+                        grid_html += "</td>"
+                    grid_html += "</tr>"
+                grid_html += "</table>"
+            else:
+                grid_html = "<br><b>No grid search performed (fixed parameters).</b>"
             
             metrics_html = get_metrics_table(
                 data_dict["val_orig"][val_pred_xgb.index].values, val_pred_xgb.values,
@@ -279,7 +296,7 @@ class Launcher(QWidget):
 
             self.diagnostica_label.setText(
                 diagnostica_text +
-                # grid_html +
+                grid_html +
                 f"<br><hr><br>Best XGBoost config: {best_config}<br>"
                 f"Validation predictions shape: {val_pred_xgb.shape}<br>"
                 f"Test predictions shape: {test_pred_xgb.shape}<br>"
