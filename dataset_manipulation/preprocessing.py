@@ -33,9 +33,6 @@ def preprocess_column(
     apply_kalman=False,
     plot=True,
 ):
-    """
-    Preprocessing senza differenza! Solo outlier, Box-Cox, Kalman, scaling.
-    """
     # 1. Filtering, splitting the dataset and initial statistical tests
     dataset = df.loc[df[col_name] > 0, col_name].dropna()
     n = len(dataset)
@@ -143,7 +140,7 @@ def preprocess_column(
         "kalman_applied": apply_kalman
     }
 
-    # Final series: align to original dataset index (no values lost)
+    # Final series: align to original dataset index 
     final_series = pd.Series(index=dataset.index, dtype=float)
     final_series.loc[train_scaled.index] = train_scaled
     final_series.loc[val_scaled.index] = val_scaled
@@ -160,7 +157,7 @@ def inverse_transform_predictions_forecast(pred_processed, preprocess_params):
     else:
         pred_unscaled = pred_processed.copy()
 
-    # Inverse Box-Cox (se necessario)
+    # Inverse Box-Cox 
     if preprocess_params.get('boxcox_applied') and preprocess_params.get('boxcox_lambda') is not None:
         lmbda = preprocess_params['boxcox_lambda']
         shift = preprocess_params.get('boxcox_shift', 0)

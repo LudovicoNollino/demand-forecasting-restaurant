@@ -83,7 +83,6 @@ def fit_xgboost_model(
     look_back=7,
     n_estimators=100,
     future_steps=30,
-    verbose=True,
 ):
     series_proc = pd.concat([data_dict["train"], data_dict["val"], data_dict["test"]]).astype(float)
     n_train, n_val, n_test = len(data_dict["train"]), len(data_dict["val"]), len(data_dict["test"])
@@ -108,7 +107,6 @@ def fit_xgboost_model(
         input_seq.append(pred)
     val_forecast = pd.Series(val_forecast, index=data_dict["val"].index)
     val_forecast_inv = inverse_transform_predictions_forecast(val_forecast, params)
-    val_rmse = mean_squared_error(data_dict["val_orig"].values, val_forecast_inv.values) ** 0.5
 
     # FINAL MODEL train + val
     X_trainval, y_trainval = create_sliding_window_with_features(
@@ -128,7 +126,6 @@ def fit_xgboost_model(
         input_seq.append(pred)
     test_forecast = pd.Series(test_forecast, index=data_dict["test"].index)
     test_forecast_inv = inverse_transform_predictions_forecast(test_forecast, params)
-    test_rmse = mean_squared_error(data_dict["test_orig"].values, test_forecast_inv.values) ** 0.5
 
     # FUTURE
     input_seq = list(series_proc[-look_back:])
@@ -152,9 +149,6 @@ def fit_xgboost_model(
         future_idx = np.arange(last_idx + 1, last_idx + 1 + future_steps)
     future_forecast = pd.Series(future_forecast, index=future_idx)
     future_forecast_inv = inverse_transform_predictions_forecast(future_forecast, params)
-
-    if verbose:
-        print(f"Val RMSE: {val_rmse:.4f} | Test RMSE (definitivo): {test_rmse:.4f}")
 
     from plotter import plot_forecasting
 

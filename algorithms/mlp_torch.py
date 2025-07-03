@@ -74,7 +74,6 @@ def train_mlp_model(X_train, y_train, X_val, y_val, hidden_dim1, hidden_dim2, lr
         if verbose and (epoch % print_every == 0 or epoch == n_epochs - 1):
             print(f"Epoch {epoch}: Train Loss {train_loss:.6f}, Val Loss {val_loss:.6f}")
 
-    # Ripristina i pesi migliori e metti in eval
     if best_weights is not None:
         model.load_state_dict(best_weights)
     model.eval()
@@ -144,7 +143,7 @@ def fit_mlp_model(
     col_name="Serie",
     verbose=True
 ):
-    # --- ESTRAI SERIE E FEATURE ---
+    # --- EXTRACT SERIES AND FEATURES ---
     series_proc = pd.concat([data_dict["train"], data_dict["val"], data_dict["test"]]).values.astype(np.float32)
     n_train, n_val, n_test = len(data_dict["train"]), len(data_dict["val"]), len(data_dict["test"])
     preprocess_params = data_dict['preprocess_params']
@@ -154,7 +153,7 @@ def fit_mlp_model(
     else:
         features = pd.DataFrame(np.zeros((len(series_proc), 0)), index=range(len(series_proc)))
 
-    # --- SLIDING WINDOW SU SERIE + FEATURE TARGET ---
+    # --- SLIDING WINDOW ON SERIES + FEATURE TARGET ---
     X_train, y_train = create_sliding_windows_with_features(series_proc[:n_train+window_size], features.iloc[:n_train+window_size], window_size)
     X_val, y_val = create_sliding_windows_with_features(series_proc[n_train:n_train+n_val+window_size], features.iloc[n_train:n_train+n_val+window_size], window_size)
     X_test, y_test = create_sliding_windows_with_features(series_proc[n_train+n_val:], features.iloc[n_train+n_val:], window_size)
@@ -180,7 +179,7 @@ def fit_mlp_model(
         best_params = (hidden_dim1, hidden_dim2, lr, activation, n_epochs, batch_size)
         grid = None
 
-    # Predict e inversione scala
+    # Prediction and scale inversion
     model.eval()
     X_vl = torch.FloatTensor(X_val)
     X_ts = torch.FloatTensor(X_test)
@@ -193,7 +192,7 @@ def fit_mlp_model(
     val_pred_orig = pd.Series(y_val_inv, index=data_dict["val_orig"].index[-len(y_val_inv):])
     test_pred_orig = pd.Series(y_test_inv, index=data_dict["test_orig"].index[-len(y_test_inv):])
 
-    # Forecast autoregressivo futuro
+    # Future Autoregressive Forecasting
     input_seq = series_proc[-window_size:].copy()
     last_feat_idx = len(series_proc) - window_size
     future_forecast = []
@@ -221,7 +220,6 @@ def fit_mlp_model(
         future_idx_orig = np.arange(last_idx + 1, last_idx + 1 + future_steps)
     future_pred_orig = pd.Series(future_forecast_inv, index=future_idx_orig)
 
-    # Chiama solo plot originale
     from plotter import plot_forecasting
     plot_forecasting(
         col_name=col_name,

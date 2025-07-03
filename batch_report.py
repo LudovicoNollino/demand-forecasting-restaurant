@@ -1,10 +1,10 @@
 import os
 import pandas as pd
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')  # Usa un backend non interattivo
-import matplotlib.pyplot as plt
-plt.show = lambda *args, **kwargs: None  # Disabilita plt.show()
+# import matplotlib
+# matplotlib.use('Agg') 
+# import matplotlib.pyplot as plt
+# plt.show = lambda *args, **kwargs: None  
 from dataset_manipulation.preprocessing import preprocess_column
 from algorithms.SARIMAX import sarimax_grid_search, fit_sarimax_model
 from algorithms.mlp_torch import fit_mlp_model
@@ -16,7 +16,7 @@ def run_full_report():
         "Numero ospiti": {
             "MLP": dict(apply_boxcox=True, apply_kalman=True, apply_standardization=True),
             "SARIMAX": dict(apply_boxcox=False, apply_kalman=False, apply_standardization=False),
-            "XGBoost": dict(apply_boxcox=False, apply_kalman=False, apply_standardization=True)
+            "XGBoost": dict(apply_boxcox=True, apply_kalman=True, apply_standardization=False)
         },
         "Chiusura di giornata (scalata in un intervallo)": {
             "MLP": dict(apply_boxcox=False, apply_kalman=False, apply_standardization=True),

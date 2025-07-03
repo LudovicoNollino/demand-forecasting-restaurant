@@ -1,10 +1,8 @@
 import numpy as np
-import datetime
 from utils import calc_metrics
 
 def create_global_report(all_reports):
     md_content = "# DEMAND FORECASTING RESULTS\n"
-    md_content += f"**Generated on:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
     for rep in all_reports:
         target = rep['target']
@@ -62,7 +60,7 @@ def create_global_report(all_reports):
 
     # Save in the project folder
     import os
-    out_path = os.path.join(os.path.dirname(__file__), 'model_results_summary_TOTAL.md')
+    out_path = os.path.join(os.path.dirname(__file__), 'global_report.md')
     with open(out_path, 'w', encoding='utf-8') as f:
         f.write(md_content)
     print(f"Global report generated: {out_path}")

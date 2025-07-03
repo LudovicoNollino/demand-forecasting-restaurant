@@ -17,6 +17,8 @@ from utils import get_metrics_table
 from batch_report import run_full_report
 
 class Launcher(QWidget):
+    
+    # GUI config  
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Launcher")
@@ -54,20 +56,10 @@ class Launcher(QWidget):
         layout.addWidget(QLabel("Step by Step Diagnostics:"))
         layout.addWidget(self.diagnostica_label)
         self.setLayout(layout)
-    
-    def run_full_report(self):
-        reply = QMessageBox.question(
-            self,
-            "Generate Global Report",
-            "This will generate a comprehensive report of all analyses. Proceed?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        if reply == QMessageBox.Yes:
-            self.run_full_report()
-        else:
-            QMessageBox.information(self, "Cancelled", "Global report generation cancelled.")
 
     def get_best_preprocessing(self, col, algorithm):
+        
+        # Define the best preprocessing configuration based on the column and algorithm
         
         if col == "Chiusura di giornata (scalata in un intervallo)":
             if algorithm == "MLP":
@@ -82,25 +74,29 @@ class Launcher(QWidget):
             elif algorithm == "SARIMAX":
                 return dict(apply_boxcox=False, apply_kalman=False, apply_standardization=False)
             elif algorithm == "XGBoost":
-                return dict(apply_boxcox=False, apply_kalman=False, apply_standardization=True)
+                return dict(apply_boxcox=True, apply_kalman=True, apply_standardization=False)
         
         return dict(apply_boxcox=False, apply_kalman=False, apply_standardization=False)
 
     def run_analysis(self):
+        
         col = self.col_combo.currentText()
         algorithm = self.alg_combo.currentText()
 
         dataset_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '..', 'dataset', 'chiusure_di giornata_autentiko_beach_estate_2024.csv')
         )
+        # Load and preprocess the dataset
         df = pd.read_csv(dataset_path, sep=';')
         df.columns = df.columns.str.strip()
         df['Data di chiusura'] = pd.to_datetime(df['Data di chiusura'], dayfirst=True, errors='raise')
         df = df.sort_values('Data di chiusura').reset_index(drop=True)
         df = df.drop_duplicates(subset='Data di chiusura', keep='first')
         df = df.set_index('Data di chiusura') 
+        # Add weekend and day of week features
         df['is_weekend'] = df.index.weekday >= 5
         df['day_of_week'] = df.index.weekday
+        # Convert day of week to dummy variables
         df = pd.get_dummies(df, columns=['day_of_week'], prefix='dow')
         feature_cols = [c for c in df.columns if c.startswith('dow_')] + ['is_weekend']
 
@@ -109,6 +105,8 @@ class Launcher(QWidget):
         # --- PREPROCESSING CONFIG ---
         best_preproc = self.get_best_preprocessing(col, algorithm)
         
+        # --- DIAGNOSTICS ---
+        # Perform ADF and Shapiro tests on the original series
         orig = df[col].dropna()
         adf_p = adfuller(orig)[1]
         adf_msg = "stationary" if adf_p < 0.05 else "NOT stationary"
@@ -119,7 +117,8 @@ class Launcher(QWidget):
             f"ADF p-value: <b>{adf_p:.4f}</b> &rarr; {adf_msg}<br>"
             f"Shapiro p-value: <b>{shapiro_p:.4f}</b> &rarr; {shapiro_msg}<br>"
         )
-
+        
+        # Preprocess the column with the best preprocessing configuration
         proc, params = preprocess_column(
             df, col,
             apply_boxcox=best_preproc['apply_boxcox'],
@@ -128,6 +127,7 @@ class Launcher(QWidget):
             plot=True
         )
         
+        # Perform diagnostics on the preprocessed series
         adf_p2 = adfuller(proc)[1]
         adf_msg2 = "stationary" if adf_p2 < 0.05 else "NOT stationary"
         shapiro_p2 = shapiro(proc)[1]
@@ -139,7 +139,8 @@ class Launcher(QWidget):
             f"<br><i>Preprocessing applied: BoxCox={best_preproc['apply_boxcox']}, "
             f"Kalman={best_preproc['apply_kalman']}, Standard={best_preproc['apply_standardization']}</i>"
         )
-
+        
+        # Prepare features for modeling
         feature_cols = [c for c in df.columns if c.startswith('dow_')] + ['is_weekend']
         features = df.loc[proc.index, feature_cols].copy()
         features = features.astype(np.float32)
@@ -155,6 +156,8 @@ class Launcher(QWidget):
             return
 
         # --- MODELING ---
+        
+        # Split the processed data into train, validation, and test sets
         n = len(proc)
         n_train = int(n * 0.70)
         n_val = int(n * 0.15)
@@ -169,7 +172,8 @@ class Launcher(QWidget):
         
         print("Test MEAN:", np.mean(test_orig))
         print("Test STANDARD DEVIATION:", np.std(test_orig))
-
+        
+        # Prepare the data dictionary for modeling
         data_dict = {
             "train": train,
             "val": val,
@@ -193,12 +197,10 @@ class Launcher(QWidget):
                 col_name=col,
                 exog=features
             )
-            # Calcola la tabella metriche unica
             metrics_html = get_metrics_table(
                 data_dict["val_orig"][val_pred.index].values, val_pred.values,
                 data_dict["test_orig"][test_pred.index].values, test_pred.values
             )
-            # Opzionale: differencing diagnostico come avevi già
             d = best_order[1]
             D = best_seasonal[1]
             s = best_seasonal[3]
@@ -308,6 +310,18 @@ class Launcher(QWidget):
         else:
             self.diagnostica_label.setText("Invalid algorithm.")
             QMessageBox.warning(self, "Error", "Invalid algorithm.")
+    
+    def run_full_report(self):
+        reply = QMessageBox.question(
+            self,
+            "Generate Global Report",
+            "This will generate a comprehensive report of all analyses. Proceed?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.run_full_report()
+        else:
+            QMessageBox.information(self, "Cancelled", "Global report generation cancelled.")
 
     @staticmethod
     def diagnostica_post_diff(series, d, D, s, col_name):
