@@ -34,7 +34,7 @@ def preprocess_column(
     plot=True,
 ):
     # 1. Filtering, splitting the dataset and initial statistical tests
-    dataset = df.loc[df[col_name] > 0, col_name].dropna()
+    dataset = df[col_name].dropna().copy()
     n = len(dataset)
     n_train = int(n * train_size)
     n_val = int(n * val_size)

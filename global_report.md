@@ -6,19 +6,19 @@
 ## Target: **Numero ospiti**
 - **Train:** 70
 - **Validation:** 15
-- **Test:** 11
-- **Total:** 96
+- **Test:** 15
+- **Total:** 100
 
 | Set | Model | RMSE | MAE | MAPE (%) |
 |-----|-------|------|-----|----------|
-| Validation | SARIMAX | 40.9213 | 31.2812 | 27.04 |
-| Validation | MLP | 13.2022 | 11.0545 | 10.29 |
-| Validation | XGBoost | 8.1450 | 6.5827 | 5.95 |
-| Test | SARIMAX | 41.9760 | 31.7692 | 42.16 |
-| Test | MLP | 18.4358 | 13.1702 | 24.65 |
-| Test | XGBoost | 31.0155 | 21.3559 | 19.12 |
+| Validation | SARIMAX | 42.3663 | 31.2011 | 31.55 |
+| Validation | MLP | 33.5126 | 22.6202 | 22.83 |
+| Validation | XGBoost | 16.5990 | 11.7899 | 12.31 |
+| Test | SARIMAX | 36.5730 | 26.9732 | 34.24 |
+| Test | MLP | 44.4923 | 32.9533 | 35.55 |
+| Test | XGBoost | 32.5464 | 21.9571 | 20.21 |
 
-**Best model (test RMSE):** MLP with RMSE=18.4358
+**Best model (test RMSE):** XGBoost with RMSE=32.5464
 
 
 ---
@@ -26,16 +26,16 @@
 ## Target: **Chiusura di giornata (scalata in un intervallo)**
 - **Train:** 70
 - **Validation:** 15
-- **Test:** 11
-- **Total:** 96
+- **Test:** 15
+- **Total:** 100
 
 | Set | Model | RMSE | MAE | MAPE (%) |
 |-----|-------|------|-----|----------|
-| Validation | SARIMAX | 436.0000 | 301.4236 | 18.67 |
-| Validation | MLP | 559.3948 | 442.7350 | 27.25 |
-| Validation | XGBoost | 156.2661 | 117.0151 | 7.47 |
-| Test | SARIMAX | 657.8805 | 601.5173 | 51.25 |
-| Test | MLP | 683.8828 | 658.2415 | 67.54 |
-| Test | XGBoost | 148.3120 | 107.6900 | 7.13 |
+| Validation | SARIMAX | 303.1121 | 209.7522 | 14.53 |
+| Validation | MLP | 430.3266 | 352.4747 | 26.55 |
+| Validation | XGBoost | 220.3090 | 172.0674 | 12.71 |
+| Test | SARIMAX | 465.0945 | 370.6395 | 29.21 |
+| Test | MLP | 381.8148 | 341.4259 | 30.34 |
+| Test | XGBoost | 137.8145 | 102.2806 | 6.71 |
 
-**Best model (test RMSE):** XGBoost with RMSE=148.3120
+**Best model (test RMSE):** XGBoost with RMSE=137.8145
